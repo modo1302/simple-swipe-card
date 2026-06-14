@@ -211,6 +211,42 @@ export class SimpleSwipeCardEditor extends LitElement {
   }
 
   /**
+   * Sets or clears the per-slide pagination icon for a card
+   * @param {number} index - The index of the card
+   * @param {string} icon - The MDI icon name (empty string clears it)
+   * @private
+   */
+  _setCardIcon(index, icon) {
+    if (
+      !this._config?.cards ||
+      index < 0 ||
+      index >= this._config.cards.length
+    ) {
+      return;
+    }
+    const cards = [...this._config.cards];
+    const card = { ...cards[index] };
+    if (icon) {
+      card.pagination_icon = icon;
+    } else {
+      delete card.pagination_icon;
+    }
+    cards[index] = card;
+    this._config = { ...this._config, cards };
+    this.configManager.fireConfigChanged();
+    this.requestUpdate();
+  }
+
+  /**
+   * Toggles the inline per-slide icon picker for a card row
+   * @param {number} index - The index of the card
+   * @private
+   */
+  _toggleCardIconPicker(index) {
+    this.uiManager.toggleIconPicker(index);
+  }
+
+  /**
    * Safely adds a card to the configuration without triggering editor replacement
    * @param {Object} cardConfig - Card configuration to add
    * @private
@@ -301,6 +337,9 @@ export class SimpleSwipeCardEditor extends LitElement {
             this._moveNestedCard.bind(this),
             this._editNestedCard.bind(this),
             this._removeNestedCard.bind(this),
+            this.uiManager.isIconPickerOpen.bind(this.uiManager),
+            this._toggleCardIconPicker.bind(this),
+            this._setCardIcon.bind(this),
           )}
           ${renderCardPicker(
             this.hass,

@@ -19,6 +19,9 @@ export class EditorUIManager {
       cards: true, // Cards section expanded by default
     };
 
+    // Tracks which card rows have their inline per-slide icon picker expanded
+    this.openIconPickers = new Set();
+
     // Initialize throttling properties
     this._cardPickerLoadThrottle = null;
     this._editorUpdateThrottle = null;
@@ -95,6 +98,28 @@ export class EditorUIManager {
    */
   getCollapsibleState() {
     return this.collapsibleState;
+  }
+
+  /**
+   * Toggles the inline per-slide icon picker for a card row
+   * @param {number} index - Card index
+   */
+  toggleIconPicker(index) {
+    if (this.openIconPickers.has(index)) {
+      this.openIconPickers.delete(index);
+    } else {
+      this.openIconPickers.add(index);
+    }
+    this.editor.requestUpdate();
+  }
+
+  /**
+   * Whether the inline per-slide icon picker is open for a card row
+   * @param {number} index - Card index
+   * @returns {boolean} True if the picker is expanded
+   */
+  isIconPickerOpen(index) {
+    return this.openIconPickers.has(index);
   }
 
   /**

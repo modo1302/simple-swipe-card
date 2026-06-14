@@ -15,7 +15,7 @@ Simple Swipe Card is a customizable container for Home Assistant that lets you p
 
 ## Features
 - Swipe between multiple cards
-- Pagination dots
+- Pagination dots or icons
 - Configurable card spacing
 - Visual editor support
 - Multiple loop modes
@@ -81,9 +81,6 @@ Because native scrolling does not animate the slides itself, some features are u
 - Free swipe behavior
 - Auto height
 
-> [!NOTE]
-> These options are only overridden at runtime — your other settings are preserved, so switching back to the JavaScript strategy restores them.
-
 ## Installation
 
 ### HACS (Recommended)
@@ -102,8 +99,6 @@ Or click this button to open the repository page in HACS:
 5. Click "Add"
 6. Search for "Simple Swipe Card" and install it
 
-> [!NOTE]  
-> As of v2.4.0, Simple Swipe Card works completely offline using Home Assistant's built-in dependencies, with no external CDN requirements.
 
 ### Manual Installation
 1. Download `simple-swipe-card.js` from the latest release or from the `/build` folder in the main repository
@@ -196,9 +191,39 @@ This card can be configured using the visual editor or YAML.
 > [!NOTE]
 > **Backdrop Filter Support**: The `enable_backdrop_filter` option allows CSS `backdrop-filter` effects (blur, etc.) to work with card-mod. Due to browser limitations, `backdrop-filter` conflicts with `clip-path`, which is used for dropdown overflow. When enabled:
 > - ✅ Backdrop-filter effects work correctly
-> - ❌ Dropdown menus do not overflow card boundaries
+> - ❌ Dropdown menus do not overflow card boundaries<img src="https://raw.githubusercontent.com/nutteloost/simple-swipe-card/main/images/visual_editor_card_editor.png" width="750" alt="Visual editor" title="Visual editor" style="border-radius:20px">
 >
 > Only enable this option if you're using `backdrop-filter: blur()` in your card-mod CSS and need it to work. The toggle is available in the Advanced Options section of the visual editor.
+
+### Per-Slide Pagination Icons
+
+Instead of the default dot, any slide can show a custom icon in its pagination indicator. Add a `pagination_icon` (any Material Design Icon, e.g. `mdi:home`) to the individual card: slides with an icon show it in place of their dot, and slides without one keep a normal dot — you can freely mix dots and icons. The active slide's icon is highlighted in the active color, and clicking an icon navigates to that slide just like a dot.
+
+In the visual editor, open the **Cards** section and click the icon button next to a card's up/down arrows to pick (or clear) that slide's icon.
+
+<img src="https://raw.githubusercontent.com/nutteloost/simple-swipe-card/main/images/simple-swipe-card_pagination_icons.png" width="750" alt="Pagination icons" title="Pagination icons" style="border-radius:20px">
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `pagination_icon` | string | none | Set on an individual card. Material Design Icon shown in place of that slide's pagination dot. Omit to keep a normal dot |
+
+```yaml
+type: custom:simple-swipe-card
+cards:
+  - type: distribution
+    entities:
+      - sensor.power_consumption
+    pagination_icon: mdi:transmission-tower
+  - type: entities
+    entities:
+      - sensor.time
+    pagination_icon: mdi:fire
+  - type: weather-forecast
+    entity: weather.home
+    # no pagination_icon → this slide keeps a normal dot
+```
+
+The icon size, hover color, active size, and shadow are themable — see [Pagination Icons](#pagination-icons) in the CSS variables reference.
 
 ### Example Configuration
 
@@ -465,6 +490,19 @@ card_mod:
 --simple-swipe-card-pagination-dot-active-hover-transform: none;                /* Transform effect when hovering over active dot */
 --simple-swipe-card-pagination-dot-active-hover-box-shadow: none;               /* Box shadow when hovering over active dot */
 ```
+
+#### Pagination Icons
+These variables apply to slides that use a [per-slide icon](#per-slide-pagination-icons) instead of a dot.
+
+```yaml
+--simple-swipe-card-pagination-icon-size: 18px;                                /* Size of an inactive slide's icon */
+--simple-swipe-card-pagination-icon-active-size: 18px;                         /* Size of the active slide's icon (defaults to the inactive size) */
+--simple-swipe-card-pagination-icon-hover-color: <inactive color>;             /* Icon color on hover (defaults to the inactive color, i.e. no hover change) */
+--simple-swipe-card-pagination-icon-shadow: none;                              /* Drop-shadow filter for the icon, e.g. drop-shadow(0 1px 2px rgba(0,0,0,0.4)) */
+```
+
+> [!NOTE]
+> Icons reuse the dot **color** variables — including the per-slide `--simple-swipe-card-pagination-dot-slide{n}-color` / `...-slide{n}-active-color` colors — as well as the **opacity**, **spacing**, and **container** variables automatically. An icon picks up its inactive/active color from the same variables a dot would. The dot **geometry** variables (size, border, border-radius, box-shadow) do not apply to icons; use the icon-specific variables above instead.
 
 #### Pagination Container Styling
 ```yaml

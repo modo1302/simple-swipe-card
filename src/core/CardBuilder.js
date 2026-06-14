@@ -14,6 +14,21 @@ import { handleEditClick } from "../utils/EventHelpers.js";
 import { applyUix } from "./UixIntegration.js";
 
 /**
+ * Returns a card config without simple-swipe-card's own editor-only keys
+ * (e.g. `pagination_icon`) so they're never handed to the child card's
+ * setConfig, where a strict card could reject the unknown property. Returns the
+ * original object untouched when there's nothing to strip.
+ * @param {Object} config - Card configuration
+ * @returns {Object} Config safe to pass to createCardElement
+ */
+function stripInternalCardKeys(config) {
+  if (!config || config.pagination_icon === undefined) return config;
+  const clean = { ...config };
+  delete clean.pagination_icon;
+  return clean;
+}
+
+/**
  * Card builder class for managing card creation and layout
  */
 export class CardBuilder {
@@ -729,8 +744,10 @@ export class CardBuilder {
     };
 
     try {
-      // Create the card element
-      cardElement = await helpers.createCardElement(cardConfig);
+      // Create the card element (strip our editor-only keys first)
+      cardElement = await helpers.createCardElement(
+        stripInternalCardKeys(cardConfig),
+      );
 
       // CRITICAL: Check if this build is still current after async operation
       // This prevents duplicate cards when multiple builds overlap (e.g., in Masonry layouts)
@@ -2643,7 +2660,9 @@ export class CardBuilder {
           return null;
         }
 
-        const cardElement = await helpers.createCardElement(cardInfo.config);
+        const cardElement = await helpers.createCardElement(
+          stripInternalCardKeys(cardInfo.config),
+        );
 
         // CRITICAL: Check if this build is still current after async operation
         if (

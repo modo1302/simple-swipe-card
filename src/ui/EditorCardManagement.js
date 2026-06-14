@@ -205,6 +205,10 @@ export class EditorCardManagement {
     }
 
     const cardConfig = this.editor._config.cards[index];
+    // Our per-slide icon lives on the card config but is owned by us, not by the
+    // child card editor. Capture it so we can re-attach it after the child
+    // dialog saves (a child editor that drops unknown keys must not lose it).
+    const prevPaginationIcon = cardConfig?.pagination_icon;
     const hass = this.editor.hass;
     const mainApp = document.querySelector("home-assistant");
 
@@ -421,7 +425,9 @@ export class EditorCardManagement {
                 "Silently updating config with element changes",
               );
               const updatedCards = [...this.editor._config.cards];
-              updatedCards[index] = savedCardConfig;
+              updatedCards[index] = prevPaginationIcon
+                ? { ...savedCardConfig, pagination_icon: prevPaginationIcon }
+                : savedCardConfig;
               this.editor._config = {
                 ...this.editor._config,
                 cards: updatedCards,
@@ -452,7 +458,9 @@ export class EditorCardManagement {
 
           if (!savedCardConfig) return;
           const updatedCards = [...this.editor._config.cards];
-          updatedCards[index] = savedCardConfig;
+          updatedCards[index] = prevPaginationIcon
+            ? { ...savedCardConfig, pagination_icon: prevPaginationIcon }
+            : savedCardConfig;
           this.editor._config = { ...this.editor._config, cards: updatedCards };
           // Fire a BUBBLING event here, as the edit session for this card IS finished.
           this.editor.configManager.fireConfigChanged({
@@ -486,7 +494,9 @@ export class EditorCardManagement {
           saveCardConfig: async (savedCardConfig) => {
             if (!savedCardConfig) return;
             const updatedCards = [...this.editor._config.cards];
-            updatedCards[index] = savedCardConfig;
+            updatedCards[index] = prevPaginationIcon
+              ? { ...savedCardConfig, pagination_icon: prevPaginationIcon }
+              : savedCardConfig;
             this.editor._config = {
               ...this.editor._config,
               cards: updatedCards,

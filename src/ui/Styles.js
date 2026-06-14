@@ -486,6 +486,63 @@ export function getStyles() {
         /* Active box shadow support */
         box-shadow: var(--simple-swipe-card-pagination-dot-active-box-shadow, var(--simple-swipe-card-pagination-dot-box-shadow, none));
     }
+
+    /* Per-slide icon indicators. The <ha-icon> lives inside the .pagination-dot
+       wrapper, so opacity, dot-spacing and all container styling carry over from
+       the dot rules above, and colour reuses the same resolved variables so the
+       inactive/active and per-slide colour theming applies to icons too. Dot
+       geometry (size/border/radius/shadow) does NOT apply to a glyph; the four
+       icon-specific vars below cover size (inactive/active), hover colour and a
+       drop-shadow. These .has-icon rules come after .pagination-dot.active so
+       (at equal specificity) they win for shared properties on the active slide,
+       keeping the active icon background-free while still recolouring it. */
+    .pagination-dot.has-icon {
+        background-color: transparent;
+        width: auto;
+        height: auto;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        outline: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Keep icon slides background/border/shadow-free in the hover + active states
+       too. The dot state rules (.pagination-dot.active:hover is specificity 0,3,0)
+       would otherwise paint a square behind the glyph - matching that specificity
+       here and coming later in source order wins. Without this, clicking an icon
+       (which makes it active) showed a box on hover / sticky tap-hover on mobile. */
+    .pagination-dot.has-icon:hover,
+    .pagination-dot.has-icon.active,
+    .pagination-dot.has-icon.active:hover {
+        background-color: transparent;
+        border-color: transparent;
+        box-shadow: none;
+    }
+
+    .pagination-dot.has-icon ha-icon {
+        --mdc-icon-size: var(--simple-swipe-card-pagination-icon-size, 18px);
+        color: var(--ssc-pagination-dot-inactive-resolved);
+        filter: var(--simple-swipe-card-pagination-icon-shadow, none);
+        transition: color 0.2s ease, --mdc-icon-size 0.2s ease, filter 0.2s ease;
+    }
+
+    .pagination-dot.has-icon:hover ha-icon {
+        color: var(--simple-swipe-card-pagination-icon-hover-color, var(--ssc-pagination-dot-inactive-resolved));
+    }
+
+    .pagination-dot.has-icon.active ha-icon {
+        color: var(--ssc-pagination-dot-active-resolved);
+        --mdc-icon-size: var(--simple-swipe-card-pagination-icon-active-size, var(--simple-swipe-card-pagination-icon-size, 18px));
+    }
+
+    .pagination-dot.has-icon.active:hover ha-icon {
+        color: var(--simple-swipe-card-pagination-dot-active-hover-color, var(--ssc-pagination-dot-active-resolved));
+    }
 ${paginationSlideColorRules}
 
      ha-alert {
@@ -942,6 +999,37 @@ export const getEditorStyles = () => css`
     color: var(--error-color);
     margin-right: 8px;
     font-size: 18px;
+  }
+
+  /* Per-slide icon control (trigger button in the row + inline picker panel) */
+  .card-actions .slide-icon-trigger.has-icon {
+    color: var(--primary-color);
+  }
+
+  .card-actions .slide-icon-trigger:not(.has-icon) {
+    opacity: 0.55;
+  }
+
+  .slide-icon-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -2px 0 8px 24px;
+    padding: 8px 12px;
+    border-left: 2px solid var(--divider-color);
+  }
+
+  .slide-icon-panel ha-icon-picker {
+    flex-grow: 1;
+  }
+
+  .slide-icon-panel ha-icon-button {
+    color: var(--secondary-text-color);
+    flex-shrink: 0;
+  }
+
+  .slide-icon-panel ha-icon-button:hover {
+    color: var(--error-color);
   }
 
   .no-cards {

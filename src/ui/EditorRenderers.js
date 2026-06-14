@@ -23,6 +23,7 @@ import {
   mdiMagnifyPlusOutline,
   mdiDoor,
   mdiSpeedometer,
+  mdiClose,
 } from "@mdi/js";
 
 /**
@@ -1170,6 +1171,9 @@ export function renderCardsSection(
   moveNestedCard,
   editNestedCard,
   removeNestedCard,
+  isIconPickerOpen,
+  toggleCardIcon,
+  setCardIcon,
 ) {
   return html`
     <div class="section cards-section">
@@ -1197,6 +1201,9 @@ export function renderCardsSection(
                 moveNestedCard,
                 editNestedCard,
                 removeNestedCard,
+                isIconPickerOpen,
+                toggleCardIcon,
+                setCardIcon,
               ),
             )}
       </div>
@@ -1237,6 +1244,9 @@ function renderCardRow(
   moveNestedCard,
   editNestedCard,
   removeNestedCard,
+  isIconPickerOpen,
+  toggleCardIcon,
+  setCardIcon,
 ) {
   const descriptor = getCardDescriptor(card);
   const hasNested = hasNestedCards(card);
@@ -1245,6 +1255,8 @@ function renderCardRow(
   const isCurrentlyVisible = hass
     ? evaluateVisibilityConditions(card.visibility, hass)
     : true;
+  const hasPaginationIcon = !!card.pagination_icon;
+  const iconPickerOpen = isIconPickerOpen ? isIconPickerOpen(index) : false;
 
   return html`
     <div
@@ -1281,6 +1293,14 @@ function renderCardRow(
           @click=${() => moveCard(index, 1)}
         ></ha-icon-button>
         <ha-icon-button
+          class="slide-icon-trigger ${hasPaginationIcon ? "has-icon" : ""}"
+          label="Slide icon"
+          title="Set a pagination icon for this slide"
+          @click=${() => toggleCardIcon(index)}
+        >
+          <ha-icon icon=${card.pagination_icon || "mdi:image-plus"}></ha-icon>
+        </ha-icon-button>
+        <ha-icon-button
           label="Edit Card"
           path="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"
           @click=${() => editCard(index)}
@@ -1292,6 +1312,25 @@ function renderCardRow(
         ></ha-icon-button>
       </div>
     </div>
+    ${iconPickerOpen
+      ? html`
+          <div class="slide-icon-panel">
+            <ha-icon-picker
+              .hass=${hass}
+              .value=${card.pagination_icon || ""}
+              label="Slide icon"
+              @value-changed=${(e) => setCardIcon(index, e.detail.value)}
+            ></ha-icon-picker>
+            <ha-icon-button
+              label="Clear icon"
+              title="Clear icon (use a dot for this slide)"
+              .path=${mdiClose}
+              ?disabled=${!hasPaginationIcon}
+              @click=${() => setCardIcon(index, "")}
+            ></ha-icon-button>
+          </div>
+        `
+      : ""}
     ${hasNested
       ? renderNestedCards(
           nestedCards,

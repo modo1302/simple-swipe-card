@@ -82,6 +82,19 @@ export class Pagination {
         const dot = document.createElement("div");
         dot.className = "pagination-dot";
 
+        // Per-slide icon: when the underlying card config carries a
+        // `pagination_icon`, render that MDI icon in place of the dot. Slides
+        // without one keep the standard dot (mixed dots + icons is supported).
+        const paginationIcon =
+          this.card._config.cards?.[this.card.visibleCardIndices[i]]
+            ?.pagination_icon;
+        if (paginationIcon) {
+          dot.classList.add("has-icon");
+          const iconEl = document.createElement("ha-icon");
+          iconEl.icon = paginationIcon;
+          dot.appendChild(iconEl);
+        }
+
         // If state sync is enabled, don't set any initial active state
         // This prevents the jump from wrong position to correct position
         if (!hasStateSync && i === this._getCurrentDotIndex()) {
@@ -183,7 +196,24 @@ export class Pagination {
         getCustomProperty("--simple-swipe-card-pagination-dot-size") || 8;
 
       // Use the larger of the two sizes
-      const maxDotSize = Math.max(activeDotSize, inactiveDotSize);
+      let maxDotSize = Math.max(activeDotSize, inactiveDotSize);
+
+      // When any visible slide renders an icon instead of a dot, the icon glyph
+      // can be bigger than the dot, so factor its (active) size into the fixed
+      // container dimension to avoid clipping.
+      const hasAnyIcon = this.card.visibleCardIndices.some(
+        (originalIndex) =>
+          this.card._config.cards?.[originalIndex]?.pagination_icon,
+      );
+      if (hasAnyIcon) {
+        const iconSize =
+          getCustomProperty("--simple-swipe-card-pagination-icon-size") || 18;
+        const iconActiveSize =
+          getCustomProperty(
+            "--simple-swipe-card-pagination-icon-active-size",
+          ) || iconSize;
+        maxDotSize = Math.max(maxDotSize, iconSize, iconActiveSize);
+      }
 
       // Read actual padding from CSS (default is "4px 8px")
       const paddingValue =

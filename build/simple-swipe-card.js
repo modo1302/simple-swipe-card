@@ -5235,6 +5235,19 @@ class Pagination {
         const dot = document.createElement("div");
         dot.className = "pagination-dot";
 
+        // Per-slide icon: when the underlying card config carries a
+        // `pagination_icon`, render that MDI icon in place of the dot. Slides
+        // without one keep the standard dot (mixed dots + icons is supported).
+        const paginationIcon =
+          this.card._config.cards?.[this.card.visibleCardIndices[i]]
+            ?.pagination_icon;
+        if (paginationIcon) {
+          dot.classList.add("has-icon");
+          const iconEl = document.createElement("ha-icon");
+          iconEl.icon = paginationIcon;
+          dot.appendChild(iconEl);
+        }
+
         // If state sync is enabled, don't set any initial active state
         // This prevents the jump from wrong position to correct position
         if (!hasStateSync && i === this._getCurrentDotIndex()) {
@@ -5336,7 +5349,24 @@ class Pagination {
         getCustomProperty("--simple-swipe-card-pagination-dot-size") || 8;
 
       // Use the larger of the two sizes
-      const maxDotSize = Math.max(activeDotSize, inactiveDotSize);
+      let maxDotSize = Math.max(activeDotSize, inactiveDotSize);
+
+      // When any visible slide renders an icon instead of a dot, the icon glyph
+      // can be bigger than the dot, so factor its (active) size into the fixed
+      // container dimension to avoid clipping.
+      const hasAnyIcon = this.card.visibleCardIndices.some(
+        (originalIndex) =>
+          this.card._config.cards?.[originalIndex]?.pagination_icon,
+      );
+      if (hasAnyIcon) {
+        const iconSize =
+          getCustomProperty("--simple-swipe-card-pagination-icon-size") || 18;
+        const iconActiveSize =
+          getCustomProperty(
+            "--simple-swipe-card-pagination-icon-active-size",
+          ) || iconSize;
+        maxDotSize = Math.max(maxDotSize, iconSize, iconActiveSize);
+      }
 
       // Read actual padding from CSS (default is "4px 8px")
       const paddingValue =
@@ -6694,6 +6724,63 @@ function getStyles() {
         /* Active box shadow support */
         box-shadow: var(--simple-swipe-card-pagination-dot-active-box-shadow, var(--simple-swipe-card-pagination-dot-box-shadow, none));
     }
+
+    /* Per-slide icon indicators. The <ha-icon> lives inside the .pagination-dot
+       wrapper, so opacity, dot-spacing and all container styling carry over from
+       the dot rules above, and colour reuses the same resolved variables so the
+       inactive/active and per-slide colour theming applies to icons too. Dot
+       geometry (size/border/radius/shadow) does NOT apply to a glyph; the four
+       icon-specific vars below cover size (inactive/active), hover colour and a
+       drop-shadow. These .has-icon rules come after .pagination-dot.active so
+       (at equal specificity) they win for shared properties on the active slide,
+       keeping the active icon background-free while still recolouring it. */
+    .pagination-dot.has-icon {
+        background-color: transparent;
+        width: auto;
+        height: auto;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        outline: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Keep icon slides background/border/shadow-free in the hover + active states
+       too. The dot state rules (.pagination-dot.active:hover is specificity 0,3,0)
+       would otherwise paint a square behind the glyph - matching that specificity
+       here and coming later in source order wins. Without this, clicking an icon
+       (which makes it active) showed a box on hover / sticky tap-hover on mobile. */
+    .pagination-dot.has-icon:hover,
+    .pagination-dot.has-icon.active,
+    .pagination-dot.has-icon.active:hover {
+        background-color: transparent;
+        border-color: transparent;
+        box-shadow: none;
+    }
+
+    .pagination-dot.has-icon ha-icon {
+        --mdc-icon-size: var(--simple-swipe-card-pagination-icon-size, 18px);
+        color: var(--ssc-pagination-dot-inactive-resolved);
+        filter: var(--simple-swipe-card-pagination-icon-shadow, none);
+        transition: color 0.2s ease, --mdc-icon-size 0.2s ease, filter 0.2s ease;
+    }
+
+    .pagination-dot.has-icon:hover ha-icon {
+        color: var(--simple-swipe-card-pagination-icon-hover-color, var(--ssc-pagination-dot-inactive-resolved));
+    }
+
+    .pagination-dot.has-icon.active ha-icon {
+        color: var(--ssc-pagination-dot-active-resolved);
+        --mdc-icon-size: var(--simple-swipe-card-pagination-icon-active-size, var(--simple-swipe-card-pagination-icon-size, 18px));
+    }
+
+    .pagination-dot.has-icon.active:hover ha-icon {
+        color: var(--simple-swipe-card-pagination-dot-active-hover-color, var(--ssc-pagination-dot-active-resolved));
+    }
 ${paginationSlideColorRules}
 
      ha-alert {
@@ -7150,6 +7237,37 @@ const getEditorStyles = () => css`
     color: var(--error-color);
     margin-right: 8px;
     font-size: 18px;
+  }
+
+  /* Per-slide icon control (trigger button in the row + inline picker panel) */
+  .card-actions .slide-icon-trigger.has-icon {
+    color: var(--primary-color);
+  }
+
+  .card-actions .slide-icon-trigger:not(.has-icon) {
+    opacity: 0.55;
+  }
+
+  .slide-icon-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -2px 0 8px 24px;
+    padding: 8px 12px;
+    border-left: 2px solid var(--divider-color);
+  }
+
+  .slide-icon-panel ha-icon-picker {
+    flex-grow: 1;
+  }
+
+  .slide-icon-panel ha-icon-button {
+    color: var(--secondary-text-color);
+    flex-shrink: 0;
+  }
+
+  .slide-icon-panel ha-icon-button:hover {
+    color: var(--error-color);
   }
 
   .no-cards {
@@ -7736,6 +7854,21 @@ function applyUix(element, uixConfig, elementConfig, type = "card") {
  * Card creation and DOM building for Simple Swipe Card
  */
 
+
+/**
+ * Returns a card config without simple-swipe-card's own editor-only keys
+ * (e.g. `pagination_icon`) so they're never handed to the child card's
+ * setConfig, where a strict card could reject the unknown property. Returns the
+ * original object untouched when there's nothing to strip.
+ * @param {Object} config - Card configuration
+ * @returns {Object} Config safe to pass to createCardElement
+ */
+function stripInternalCardKeys(config) {
+  if (!config || config.pagination_icon === undefined) return config;
+  const clean = { ...config };
+  delete clean.pagination_icon;
+  return clean;
+}
 
 /**
  * Card builder class for managing card creation and layout
@@ -8453,8 +8586,10 @@ class CardBuilder {
     };
 
     try {
-      // Create the card element
-      cardElement = await helpers.createCardElement(cardConfig);
+      // Create the card element (strip our editor-only keys first)
+      cardElement = await helpers.createCardElement(
+        stripInternalCardKeys(cardConfig),
+      );
 
       // CRITICAL: Check if this build is still current after async operation
       // This prevents duplicate cards when multiple builds overlap (e.g., in Masonry layouts)
@@ -10367,7 +10502,9 @@ class CardBuilder {
           return null;
         }
 
-        const cardElement = await helpers.createCardElement(cardInfo.config);
+        const cardElement = await helpers.createCardElement(
+          stripInternalCardKeys(cardInfo.config),
+        );
 
         // CRITICAL: Check if this build is still current after async operation
         if (
@@ -17450,6 +17587,9 @@ class EditorUIManager {
       cards: true, // Cards section expanded by default
     };
 
+    // Tracks which card rows have their inline per-slide icon picker expanded
+    this.openIconPickers = new Set();
+
     // Initialize throttling properties
     this._cardPickerLoadThrottle = null;
     this._editorUpdateThrottle = null;
@@ -17526,6 +17666,28 @@ class EditorUIManager {
    */
   getCollapsibleState() {
     return this.collapsibleState;
+  }
+
+  /**
+   * Toggles the inline per-slide icon picker for a card row
+   * @param {number} index - Card index
+   */
+  toggleIconPicker(index) {
+    if (this.openIconPickers.has(index)) {
+      this.openIconPickers.delete(index);
+    } else {
+      this.openIconPickers.add(index);
+    }
+    this.editor.requestUpdate();
+  }
+
+  /**
+   * Whether the inline per-slide icon picker is open for a card row
+   * @param {number} index - Card index
+   * @returns {boolean} True if the picker is expanded
+   */
+  isIconPickerOpen(index) {
+    return this.openIconPickers.has(index);
   }
 
   /**
@@ -18619,6 +18781,10 @@ class EditorCardManagement {
     }
 
     const cardConfig = this.editor._config.cards[index];
+    // Our per-slide icon lives on the card config but is owned by us, not by the
+    // child card editor. Capture it so we can re-attach it after the child
+    // dialog saves (a child editor that drops unknown keys must not lose it).
+    const prevPaginationIcon = cardConfig?.pagination_icon;
     const hass = this.editor.hass;
     const mainApp = document.querySelector("home-assistant");
 
@@ -18835,7 +19001,9 @@ class EditorCardManagement {
                 "Silently updating config with element changes",
               );
               const updatedCards = [...this.editor._config.cards];
-              updatedCards[index] = savedCardConfig;
+              updatedCards[index] = prevPaginationIcon
+                ? { ...savedCardConfig, pagination_icon: prevPaginationIcon }
+                : savedCardConfig;
               this.editor._config = {
                 ...this.editor._config,
                 cards: updatedCards,
@@ -18866,7 +19034,9 @@ class EditorCardManagement {
 
           if (!savedCardConfig) return;
           const updatedCards = [...this.editor._config.cards];
-          updatedCards[index] = savedCardConfig;
+          updatedCards[index] = prevPaginationIcon
+            ? { ...savedCardConfig, pagination_icon: prevPaginationIcon }
+            : savedCardConfig;
           this.editor._config = { ...this.editor._config, cards: updatedCards };
           // Fire a BUBBLING event here, as the edit session for this card IS finished.
           this.editor.configManager.fireConfigChanged({
@@ -18900,7 +19070,9 @@ class EditorCardManagement {
           saveCardConfig: async (savedCardConfig) => {
             if (!savedCardConfig) return;
             const updatedCards = [...this.editor._config.cards];
-            updatedCards[index] = savedCardConfig;
+            updatedCards[index] = prevPaginationIcon
+              ? { ...savedCardConfig, pagination_icon: prevPaginationIcon }
+              : savedCardConfig;
             this.editor._config = {
               ...this.editor._config,
               cards: updatedCards,
@@ -19943,6 +20115,7 @@ var mdiArrowOscillating = "M6 14H9L5 18L1 14H4C4 11.3 5.7 6.6 11 6.1V8.1C7.6 8.6
 var mdiArrowRight = "M4,11V13H16L10.5,18.5L11.92,19.92L19.84,12L11.92,4.08L10.5,5.5L16,11H4Z";
 var mdiBlur = "M14,8.5A1.5,1.5 0 0,0 12.5,10A1.5,1.5 0 0,0 14,11.5A1.5,1.5 0 0,0 15.5,10A1.5,1.5 0 0,0 14,8.5M14,12.5A1.5,1.5 0 0,0 12.5,14A1.5,1.5 0 0,0 14,15.5A1.5,1.5 0 0,0 15.5,14A1.5,1.5 0 0,0 14,12.5M10,17A1,1 0 0,0 9,18A1,1 0 0,0 10,19A1,1 0 0,0 11,18A1,1 0 0,0 10,17M10,8.5A1.5,1.5 0 0,0 8.5,10A1.5,1.5 0 0,0 10,11.5A1.5,1.5 0 0,0 11.5,10A1.5,1.5 0 0,0 10,8.5M14,20.5A0.5,0.5 0 0,0 13.5,21A0.5,0.5 0 0,0 14,21.5A0.5,0.5 0 0,0 14.5,21A0.5,0.5 0 0,0 14,20.5M14,17A1,1 0 0,0 13,18A1,1 0 0,0 14,19A1,1 0 0,0 15,18A1,1 0 0,0 14,17M21,13.5A0.5,0.5 0 0,0 20.5,14A0.5,0.5 0 0,0 21,14.5A0.5,0.5 0 0,0 21.5,14A0.5,0.5 0 0,0 21,13.5M18,5A1,1 0 0,0 17,6A1,1 0 0,0 18,7A1,1 0 0,0 19,6A1,1 0 0,0 18,5M18,9A1,1 0 0,0 17,10A1,1 0 0,0 18,11A1,1 0 0,0 19,10A1,1 0 0,0 18,9M18,17A1,1 0 0,0 17,18A1,1 0 0,0 18,19A1,1 0 0,0 19,18A1,1 0 0,0 18,17M18,13A1,1 0 0,0 17,14A1,1 0 0,0 18,15A1,1 0 0,0 19,14A1,1 0 0,0 18,13M10,12.5A1.5,1.5 0 0,0 8.5,14A1.5,1.5 0 0,0 10,15.5A1.5,1.5 0 0,0 11.5,14A1.5,1.5 0 0,0 10,12.5M10,7A1,1 0 0,0 11,6A1,1 0 0,0 10,5A1,1 0 0,0 9,6A1,1 0 0,0 10,7M10,3.5A0.5,0.5 0 0,0 10.5,3A0.5,0.5 0 0,0 10,2.5A0.5,0.5 0 0,0 9.5,3A0.5,0.5 0 0,0 10,3.5M10,20.5A0.5,0.5 0 0,0 9.5,21A0.5,0.5 0 0,0 10,21.5A0.5,0.5 0 0,0 10.5,21A0.5,0.5 0 0,0 10,20.5M3,13.5A0.5,0.5 0 0,0 2.5,14A0.5,0.5 0 0,0 3,14.5A0.5,0.5 0 0,0 3.5,14A0.5,0.5 0 0,0 3,13.5M14,3.5A0.5,0.5 0 0,0 14.5,3A0.5,0.5 0 0,0 14,2.5A0.5,0.5 0 0,0 13.5,3A0.5,0.5 0 0,0 14,3.5M14,7A1,1 0 0,0 15,6A1,1 0 0,0 14,5A1,1 0 0,0 13,6A1,1 0 0,0 14,7M21,10.5A0.5,0.5 0 0,0 21.5,10A0.5,0.5 0 0,0 21,9.5A0.5,0.5 0 0,0 20.5,10A0.5,0.5 0 0,0 21,10.5M6,5A1,1 0 0,0 5,6A1,1 0 0,0 6,7A1,1 0 0,0 7,6A1,1 0 0,0 6,5M3,9.5A0.5,0.5 0 0,0 2.5,10A0.5,0.5 0 0,0 3,10.5A0.5,0.5 0 0,0 3.5,10A0.5,0.5 0 0,0 3,9.5M6,9A1,1 0 0,0 5,10A1,1 0 0,0 6,11A1,1 0 0,0 7,10A1,1 0 0,0 6,9M6,17A1,1 0 0,0 5,18A1,1 0 0,0 6,19A1,1 0 0,0 7,18A1,1 0 0,0 6,17M6,13A1,1 0 0,0 5,14A1,1 0 0,0 6,15A1,1 0 0,0 7,14A1,1 0 0,0 6,13Z";
 var mdiCards = "M21.47,4.35L20.13,3.79V12.82L22.56,6.96C22.97,5.94 22.5,4.77 21.47,4.35M1.97,8.05L6.93,20C7.24,20.77 7.97,21.24 8.74,21.26C9,21.26 9.27,21.21 9.53,21.1L16.9,18.05C17.65,17.74 18.11,17 18.13,16.26C18.14,16 18.09,15.71 18,15.45L13,3.5C12.71,2.73 11.97,2.26 11.19,2.25C10.93,2.25 10.67,2.31 10.42,2.4L3.06,5.45C2.04,5.87 1.55,7.04 1.97,8.05M18.12,4.25A2,2 0 0,0 16.12,2.25H14.67L18.12,10.59";
+var mdiClose = "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z";
 var mdiCompare = "M19,3H14V5H19V18L14,12V21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M10,18H5L10,12M10,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H10V23H12V1H10V3Z";
 var mdiDoor = "M8,3C6.89,3 6,3.89 6,5V21H18V5C18,3.89 17.11,3 16,3H8M8,5H16V19H8V5M13,11V13H15V11H13Z";
 var mdiFlash = "M7,2V13H10V22L17,10H13L17,2H7Z";
@@ -21107,6 +21280,9 @@ function renderCardsSection(
   moveNestedCard,
   editNestedCard,
   removeNestedCard,
+  isIconPickerOpen,
+  toggleCardIcon,
+  setCardIcon,
 ) {
   return html`
     <div class="section cards-section">
@@ -21134,6 +21310,9 @@ function renderCardsSection(
                 moveNestedCard,
                 editNestedCard,
                 removeNestedCard,
+                isIconPickerOpen,
+                toggleCardIcon,
+                setCardIcon,
               ),
             )}
       </div>
@@ -21174,6 +21353,9 @@ function renderCardRow(
   moveNestedCard,
   editNestedCard,
   removeNestedCard,
+  isIconPickerOpen,
+  toggleCardIcon,
+  setCardIcon,
 ) {
   const descriptor = getCardDescriptor(card);
   const hasNested = hasNestedCards(card);
@@ -21182,6 +21364,8 @@ function renderCardRow(
   const isCurrentlyVisible = hass
     ? evaluateVisibilityConditions(card.visibility, hass)
     : true;
+  const hasPaginationIcon = !!card.pagination_icon;
+  const iconPickerOpen = isIconPickerOpen ? isIconPickerOpen(index) : false;
 
   return html`
     <div
@@ -21218,6 +21402,14 @@ function renderCardRow(
           @click=${() => moveCard(index, 1)}
         ></ha-icon-button>
         <ha-icon-button
+          class="slide-icon-trigger ${hasPaginationIcon ? "has-icon" : ""}"
+          label="Slide icon"
+          title="Set a pagination icon for this slide"
+          @click=${() => toggleCardIcon(index)}
+        >
+          <ha-icon icon=${card.pagination_icon || "mdi:image-plus"}></ha-icon>
+        </ha-icon-button>
+        <ha-icon-button
           label="Edit Card"
           path="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"
           @click=${() => editCard(index)}
@@ -21229,6 +21421,25 @@ function renderCardRow(
         ></ha-icon-button>
       </div>
     </div>
+    ${iconPickerOpen
+      ? html`
+          <div class="slide-icon-panel">
+            <ha-icon-picker
+              .hass=${hass}
+              .value=${card.pagination_icon || ""}
+              label="Slide icon"
+              @value-changed=${(e) => setCardIcon(index, e.detail.value)}
+            ></ha-icon-picker>
+            <ha-icon-button
+              label="Clear icon"
+              title="Clear icon (use a dot for this slide)"
+              .path=${mdiClose}
+              ?disabled=${!hasPaginationIcon}
+              @click=${() => setCardIcon(index, "")}
+            ></ha-icon-button>
+          </div>
+        `
+      : ""}
     ${hasNested
       ? renderNestedCards(
           nestedCards,
@@ -21580,6 +21791,42 @@ class SimpleSwipeCardEditor extends LitElement {
   }
 
   /**
+   * Sets or clears the per-slide pagination icon for a card
+   * @param {number} index - The index of the card
+   * @param {string} icon - The MDI icon name (empty string clears it)
+   * @private
+   */
+  _setCardIcon(index, icon) {
+    if (
+      !this._config?.cards ||
+      index < 0 ||
+      index >= this._config.cards.length
+    ) {
+      return;
+    }
+    const cards = [...this._config.cards];
+    const card = { ...cards[index] };
+    if (icon) {
+      card.pagination_icon = icon;
+    } else {
+      delete card.pagination_icon;
+    }
+    cards[index] = card;
+    this._config = { ...this._config, cards };
+    this.configManager.fireConfigChanged();
+    this.requestUpdate();
+  }
+
+  /**
+   * Toggles the inline per-slide icon picker for a card row
+   * @param {number} index - The index of the card
+   * @private
+   */
+  _toggleCardIconPicker(index) {
+    this.uiManager.toggleIconPicker(index);
+  }
+
+  /**
    * Safely adds a card to the configuration without triggering editor replacement
    * @param {Object} cardConfig - Card configuration to add
    * @private
@@ -21670,6 +21917,9 @@ class SimpleSwipeCardEditor extends LitElement {
             this._moveNestedCard.bind(this),
             this._editNestedCard.bind(this),
             this._removeNestedCard.bind(this),
+            this.uiManager.isIconPickerOpen.bind(this.uiManager),
+            this._toggleCardIconPicker.bind(this),
+            this._setCardIcon.bind(this),
           )}
           ${renderCardPicker(
             this.hass,
