@@ -191,7 +191,7 @@ This card can be configured using the visual editor or YAML.
 > [!NOTE]
 > **Backdrop Filter Support**: The `enable_backdrop_filter` option allows CSS `backdrop-filter` effects (blur, etc.) to work with card-mod. Due to browser limitations, `backdrop-filter` conflicts with `clip-path`, which is used for dropdown overflow. When enabled:
 > - ✅ Backdrop-filter effects work correctly
-> - ❌ Dropdown menus do not overflow card boundaries<img src="https://raw.githubusercontent.com/nutteloost/simple-swipe-card/main/images/visual_editor_card_editor.png" width="750" alt="Visual editor" title="Visual editor" style="border-radius:20px">
+> - ❌ Dropdown menus do not overflow card boundaries
 >
 > Only enable this option if you're using `backdrop-filter: blur()` in your card-mod CSS and need it to work. The toggle is available in the Advanced Options section of the visual editor.
 
@@ -201,7 +201,7 @@ Instead of the default dot, any slide can show a custom icon in its pagination i
 
 In the visual editor, open the **Cards** section and click the icon button next to a card's up/down arrows to pick (or clear) that slide's icon.
 
-<img src="https://raw.githubusercontent.com/nutteloost/simple-swipe-card/main/images/simple-swipe-card_pagination_icons.png" width="750" alt="Pagination icons" title="Pagination icons" style="border-radius:20px">
+<img src="https://raw.githubusercontent.com/nutteloost/simple-swipe-card/main/images/simple-swipe-card_pagination_icons.png" width="500" alt="Pagination icons" title="Pagination icons" style="border-radius:20px">
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
