@@ -650,6 +650,23 @@ export class CardBuilder {
           await Promise.allSettled(batchPromises);
           this._insertLoadedCardsIntoDom();
           logDebug("INIT", `Batch ${i + 1} completed`);
+
+          // Background batches can contain cards positioned *before* the
+          // currently shown one (stagger loading prioritizes cards near
+          // currentIndex, not DOM order). Inserting their slides shifts the
+          // native CSS scroll-snap container's content ahead of the current
+          // scroll offset; the browser's scroll anchoring then silently
+          // shifts scrollTop to keep the same pixels on screen, which the
+          // passive scroll listener reads back as a navigation and corrupts
+          // currentIndex (#122). Re-snap to the intended slide once this
+          // batch's DOM insertion has settled.
+          if (
+            this.card.scrollStrategy?.isNative() &&
+            this.card.initialized &&
+            (!buildTimestamp || this.card._currentBuildTimestamp === buildTimestamp)
+          ) {
+            this.card.scrollStrategy.scrollToIndex(this.card.currentIndex, false);
+          }
         }, delay);
       }
 
